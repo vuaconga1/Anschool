@@ -54,6 +54,12 @@ builder.Services.AddScoped<SpeechAssessmentService>();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<WeWinDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -71,10 +77,27 @@ if (app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 app.UseCors("Frontend");
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var message = feature?.Error?.GetBaseException().Message ?? "Unhandled server error";
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(ApiResponse.Fail(message));
+    });
+});
 app.UseRateLimiter();
 app.UseStaticFiles();
 
 app.MapGet("/api/health", () => Results.Ok(ApiResponse.Ok(new { ok = true, message = "WeWIN .NET API is ready" })));
+app.MapGet("/api/health/db", async (WeWinDbContext db) =>
+{
+    var canConnect = await db.Database.CanConnectAsync();
+    var units = canConnect ? await db.Units.AsNoTracking().CountAsync() : -1;
+    return Results.Ok(ApiResponse.Ok(new { ok = canConnect, units }));
+});
 app.MapGameEndpoints();
 app.MapImportEndpoints();
 app.MapMediaEndpoints();
