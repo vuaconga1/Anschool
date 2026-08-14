@@ -39,8 +39,11 @@ function resolveAudioFileName(name: string) {
 }
 
 function localAssetPath(folder: 'images' | 'audios', name: string) {
-  const cleaned = normalizeAssetFileName(folder === 'audios' ? resolveAudioFileName(name) : name)
+  let cleaned = normalizeAssetFileName(folder === 'audios' ? resolveAudioFileName(name) : name)
   if (!cleaned) return ''
+  // Audio files on disk are overwhelmingly lowercase; Title Case from EnglishText
+  // (e.g. Bank.mp3) breaks on case-sensitive hosts and some browsers.
+  if (folder === 'audios') cleaned = cleaned.toLowerCase()
   const ext = folder === 'audios' ? '.mp3' : '.jpg'
   return publicPath(`/assets/${folder}/${encodeURIComponent(cleaned)}${ext}`)
 }
@@ -84,24 +87,28 @@ function getImageNameCandidates(name: string): string[] {
   return candidates
 }
 
+function asPublicAssetUrl(raw: string) {
+  // Keep already-encoded paths intact (avoid post%20office → post%2520office).
+  return publicPath(raw.startsWith('/') ? raw : `/${raw}`)
+}
+
 export function resolveAudioUrl(url: string, fallbackName?: string) {
   const raw = String(url || '').trim()
   const name = resolveAudioFileName(String(fallbackName || '').trim())
-  const resolvedRaw = resolveAudioFileName(raw)
+
+  // Prefer API-resolved local audio paths — they already match on-disk casing
+  // (bank.mp3). Rebuilding from EnglishText used to produce Bank.mp3 and break playback.
+  if (raw.startsWith('/assets/audios/') || raw.startsWith('/assets/')) {
+    return asPublicAssetUrl(raw)
+  }
+  if (raw.startsWith('/') && !raw.startsWith('//') && !isDriveUrl(raw)) return raw
+  if (raw.startsWith('http') && !isDriveUrl(raw)) return raw
 
   if (name) {
     const local = localAssetPath('audios', name)
     if (local) return local
   }
 
-  if (resolvedRaw && resolvedRaw.startsWith('/assets/')) return publicPath(resolvedRaw)
-  if (raw && raw.startsWith('/assets/')) return publicPath(raw)
-  if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw
-  if (raw && raw.startsWith('http') && !isDriveUrl(raw)) return raw
-  if (resolvedRaw && !resolvedRaw.startsWith('http')) {
-    const local = localAssetPath('audios', resolvedRaw)
-    if (local) return local
-  }
   if (raw && !raw.startsWith('http')) {
     const local = localAssetPath('audios', raw)
     if (local) return local

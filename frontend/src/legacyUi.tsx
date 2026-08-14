@@ -53,7 +53,7 @@ export function LegacyHomeLayout({
   unitSlug,
   unitName,
   unitParam,
-  fixedKindergartenSidebarUnits,
+  onBack,
   onChooseSidebarItem,
   children,
 }: {
@@ -65,7 +65,7 @@ export function LegacyHomeLayout({
   unitSlug: string
   unitName: string
   unitParam: string
-  fixedKindergartenSidebarUnits?: SidebarUnitItem[]
+  onBack: () => void
   onChooseSidebarItem: (item: SidebarUnitItem) => void
   children: React.ReactNode
 }) {
@@ -79,8 +79,7 @@ export function LegacyHomeLayout({
     week,
     unitSlug,
     unitParam,
-    fixedKindergartenSidebarUnits,
-  }), [units, game, level, week, unitSlug, unitParam, fixedKindergartenSidebarUnits])
+  }), [units, game, level, week, unitSlug, unitParam])
 
   return (
     <div className="home-shell bg-pink-50 text-gray-900 flex flex-col min-h-screen">
@@ -117,7 +116,7 @@ export function LegacyHomeLayout({
               <div className="p-2 bg-white rounded-xl shadow-sm shrink-0">📚</div>
               <div className="sidebar-brand-copy min-w-0">
                 <p className="text-sm font-extrabold text-green-800">Kids Book</p>
-                <p className="text-[10px] text-green-600">{sidebarItems.length} unit theo link hiện tại</p>
+                <p className="text-[10px] text-green-600">{sidebarItems.length} unit</p>
               </div>
             </div>
             <button
@@ -163,8 +162,17 @@ export function LegacyHomeLayout({
           </button>
         </aside>
 
-        <main className="flex-1 min-w-0 bg-gradient-to-b from-green-50 to-emerald-100 p-4 sm:p-6 md:p-10 game-bg-frame">
-          <div className="flex justify-center mb-8">
+        <main className="relative flex-1 min-w-0 bg-gradient-to-b from-green-50 to-emerald-100 p-4 sm:p-6 md:p-10 game-bg-frame">
+          <button
+            type="button"
+            aria-label="Quay lại trang trước"
+            className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-white/90 px-4 py-2.5 text-sm font-extrabold text-emerald-700 shadow-md backdrop-blur transition hover:bg-white hover:shadow-lg active:scale-95"
+            onClick={onBack}
+          >
+            <span aria-hidden="true">←</span>
+            <span>Quay lại</span>
+          </button>
+          <div className="flex justify-center mb-8 pt-12 sm:pt-4">
             <nav className="inline-flex flex-wrap items-center gap-2 px-5 py-2 bg-white/80 backdrop-blur rounded-2xl border border-gray-200 shadow-sm text-sm font-semibold">
               <span id="breadcrumb-level" className="text-amber-600 uppercase">🎯 {getLevelDisplayText(level, game, levels)}</span>
               <span className="text-gray-300">•</span>
@@ -950,13 +958,54 @@ export function LegacySummaryView({ summary, onMenu, onReplay }: { summary: { sc
   )
 }
 
+let activeAudio: HTMLAudioElement | null = null
+
+function stopActiveAudio() {
+  if (!activeAudio) return
+  try {
+    activeAudio.onended = null
+    activeAudio.onerror = null
+    activeAudio.pause()
+    activeAudio.removeAttribute('src')
+    // Do not call load() here — it can abort the next play() in some browsers.
+  } catch {
+    // ignore cleanup errors
+  }
+  activeAudio = null
+}
+
+/** Keep a live Audio reference so the browser cannot GC it mid-play (causes intermittent silence). */
 function playAudio(url: string) {
   if (!url) return
-  new Audio(url).play().catch(() => undefined)
+
+  // Avoid TTS + MP3 fighting for the same audio output.
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel()
+  }
+
+  stopActiveAudio()
+
+  const audio = new Audio()
+  activeAudio = audio
+  audio.preload = 'auto'
+  audio.src = url
+
+  const tryPlay = () => {
+    if (activeAudio !== audio) return
+    void audio.play().catch(() => undefined)
+  }
+
+  // If metadata is already ready, play immediately (preserves user-gesture unlock).
+  if (audio.readyState >= 2) tryPlay()
+  else {
+    audio.addEventListener('canplay', tryPlay, { once: true })
+    tryPlay()
+  }
 }
 
 function playChildFeedback(success: boolean, text = '') {
   if (!window.speechSynthesis) return
+  stopActiveAudio()
   const utterance = new SpeechSynthesisUtterance(success ? (text || 'Excellent!') : 'Oops!')
   utterance.lang = 'en-US'
   utterance.rate = 0.95

@@ -2,7 +2,6 @@
 import {
   getAllGameData,
   getBootstrap,
-  getUnits,
   type GameAllResponse,
   type Level,
   type Unit,
@@ -26,7 +25,7 @@ import {
   type AppRoute,
   unitParamFromSlug,
 } from './routing'
-import { buildFixedKindergartenSidebarItems, type SidebarUnitItem } from './sidebarUnits'
+import type { SidebarUnitItem } from './sidebarUnits'
 
 export function App() {
   const initial = parseAppLocation()
@@ -42,7 +41,6 @@ export function App() {
   const [activeGame, setActiveGame] = useState<GameType>(initial.activeGame)
   const [summary, setSummary] = useState({ score: 0, correct: 0, total: 0 })
   const [status, setStatus] = useState('')
-  const [fixedKindergartenSidebarUnits, setFixedKindergartenSidebarUnits] = useState<SidebarUnitItem[]>([])
 
   const selectedUnit = units.find((unit) => unit.slug === unitSlug)
   const unitParam = unitParamFromSlug(units, unitSlug)
@@ -104,14 +102,6 @@ export function App() {
       })
       .catch((error) => setStatus(error instanceof Error ? error.message : 'Không tải được dữ liệu.'))
   }, [game])
-
-  useEffect(() => {
-    getUnits({ game: 'kindergarten' })
-      .then((kindergartenUnits) => {
-        setFixedKindergartenSidebarUnits(buildFixedKindergartenSidebarItems(kindergartenUnits))
-      })
-      .catch(() => setFixedKindergartenSidebarUnits([]))
-  }, [])
 
   useEffect(() => {
     const file = window.location.pathname.split('/').pop()?.toLowerCase() || ''
@@ -222,7 +212,14 @@ export function App() {
           unitSlug={unitSlug}
           unitName={selectedUnit?.name || '...'}
           unitParam={unitParam}
-          fixedKindergartenSidebarUnits={fixedKindergartenSidebarUnits}
+          onBack={() => {
+            // Luôn về trang chọn trước trong luồng (không dùng history.back → tránh nhảy unit).
+            if (route === 'play' || route === 'summary') {
+              navigate({ route: 'home', replace: true })
+              return
+            }
+            navigate({ route: 'chooseLevel' })
+          }}
           onChooseSidebarItem={chooseSidebarItem}
         >
           {route === 'home' && (
