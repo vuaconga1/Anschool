@@ -1,0 +1,13 @@
+# Ignore frontend/assets noise; keep backend publish context lean when building from repo root
+.git
+.github
+frontend
+deploy
+**/*.md
+**/bin
+**/obj
+backend/bin
+backend/obj
+backend/wwwroot/media
+**/.env
+**/.env.*

@@ -39,8 +39,8 @@ Hoặc trên Railway sau khi API chạy: gọi endpoint import Excel (nếu bạ
 1. [https://railway.app](https://railway.app) → Login bằng GitHub.
 2. **New Project** → **Deploy from GitHub repo** → chọn `vuaconga1/Anschool`.
 3. Cấu hình service:
-   - **Root Directory:** `backend`
-   - Dùng `backend/railway.json` + `backend/Dockerfile`
+   - **Root Directory:** để trống (repo root)
+   - **Dockerfile Path:** `Dockerfile` (file ở root repo)
    - Port: **8080**
    - Healthcheck: `/api/health`
 4. **Variables** (Settings → Variables):
